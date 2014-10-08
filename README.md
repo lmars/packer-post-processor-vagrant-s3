@@ -33,6 +33,25 @@ Add the post-processor to your packer template **after** the `vagrant` post-proc
 }
 ```
 
+Installation
+------------
+
+Install the binary:
+
+```
+$ go get github.com/lmars/packer-post-processor-vagrant-s3
+```
+
+Add the post-processor to `~/.packerconfig`:
+
+```json
+{
+  "post-processors": {
+    "vagrant-s3": "packer-post-processor-vagrant-s3"
+  }
+}
+```
+
 Configuration Options
 ---------------------
 
