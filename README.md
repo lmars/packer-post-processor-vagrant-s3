@@ -33,6 +33,8 @@ Add the post-processor to your packer template **after** the `vagrant` post-proc
 }
 ```
 
+**NOTE:** The post-processors must be a nested array (i.e. a Packer sequence definition) so that they run in order. See [here](http://www.packer.io/docs/templates/post-processors.html) for more information.
+
 Installation
 ------------
 
