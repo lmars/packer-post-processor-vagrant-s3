@@ -151,6 +151,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		return nil, false, err
 	}
 	if size > 100*1024*1024 {
+		ui.Message("File size > 100MB. Initiating multipart upload")
 		multi, err := p.s3.Multi(boxPath, "application/octet-stream", "public-read")
 		if err != nil {
 			return nil, false, err
