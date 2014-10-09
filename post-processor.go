@@ -175,7 +175,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 func (p *PostProcessor) getManifest() (*Manifest, error) {
 	body, err := p.s3.GetReader(p.config.ManifestPath)
 	if err != nil {
-		if err.(*s3.Error).Code == "NoSuchKey" {
+		if s3Err, ok := err.(*s3.Error); ok && s3Err.Code == "NoSuchKey" {
 			return &Manifest{Name: p.config.BoxName}, nil
 		}
 		return nil, err
