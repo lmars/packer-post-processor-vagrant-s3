@@ -150,8 +150,18 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	if _, err := file.Seek(0, 0); err != nil {
 		return nil, false, err
 	}
-	if err := p.s3.PutReader(boxPath, file, size, "application/octet-stream", "public-read"); err != nil {
-		return nil, false, err
+	if size > 100*1024*1024 {
+		multi, err := p.s3.Multi(boxPath, "application/octet-stream", "public-read")
+		if err != nil {
+			return nil, false, err
+		}
+		if _, err := multi.PutAll(file, 5*1024*1024); err != nil {
+			return nil, false, err
+		}
+	} else {
+		if err := p.s3.PutReader(boxPath, file, size, "application/octet-stream", "public-read"); err != nil {
+			return nil, false, err
+		}
 	}
 
 	ui.Message(fmt.Sprintf("Uploading the manifest: %s", p.config.ManifestPath))
