@@ -156,7 +156,11 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		if err != nil {
 			return nil, false, err
 		}
-		if _, err := multi.PutAll(file, 5*1024*1024); err != nil {
+		parts, err := multi.PutAll(file, 5*1024*1024)
+		if err != nil {
+			return nil, false, err
+		}
+		if err := multi.Complete(parts); err != nil {
 			return nil, false, err
 		}
 	} else {
