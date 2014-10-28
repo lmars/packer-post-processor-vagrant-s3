@@ -33,7 +33,7 @@ Add the post-processor to your packer template **after** the `vagrant` post-proc
 }
 ```
 
-**NOTE:** The post-processors must be a nested array (i.e. a Packer sequence definition) so that they run in order. See [here](http://www.packer.io/docs/templates/post-processors.html) for more information.
+**NOTE:** The post-processors must be a nested array (i.e. a Packer sequence definition) so that they run in order. See the [Packer template documentation](http://www.packer.io/docs/templates/post-processors.html) for more information.
 
 Installation
 ------------
@@ -44,7 +44,7 @@ Install the binary:
 $ go get github.com/lmars/packer-post-processor-vagrant-s3
 ```
 
-Add the post-processor to `~/.packerconfig`:
+Add the post-processor to `~/.packerconfig` (create the file if it does not already exist):
 
 ```json
 {
@@ -54,8 +54,10 @@ Add the post-processor to `~/.packerconfig`:
 }
 ```
 
-Configuration Options
----------------------
+Configuration
+-------------
+
+All configuration properties are **required**, except where noted.
 
 ### bucket
 
@@ -63,7 +65,7 @@ The S3 bucket you want to upload the box and manifest to.
 
 ### manifest
 
-The path to the manifest file in your bucket (e.g. `vagrant/manifest.json`).
+The path to the manifest file in your bucket (e.g. `vagrant/manifest.json`). If you don't have a manifest, don't worry, one will be created.
 
 This controls what users of your box will set `vm.config.box_url` to in their `Vagrantfile` (e.g. `https://s3.amazonaws.com/my-bucket/vagrant/manifest.json`).
 
@@ -79,7 +81,7 @@ The path to a directory in your bucket to store boxes in (e.g. `vagrant/boxes`).
 
 ### version
 
-The version of the box you are uploading.
+The version of the box you are uploading. The box will be uploaded to a S3 directory path that includes the version number (e.g. `vagrant/boxes/<version>`).
 
 Only one box can be uploaded per provider for a given version. If you are building an updated box, you should bump this version, meaning users of your box will be made aware of the new version.
 
