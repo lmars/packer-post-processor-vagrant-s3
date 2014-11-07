@@ -19,6 +19,7 @@ import (
 )
 
 type Config struct {
+	Region       string `mapstructure:"region"`
 	Bucket       string `mapstructure:"bucket"`
 	ManifestPath string `mapstructure:"manifest"`
 	BoxName      string `mapstructure:"box_name"`
@@ -53,6 +54,7 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 
 	// required configuration
 	templates := map[string]*string{
+		"region":   &p.config.Region,
 		"bucket":   &p.config.Bucket,
 		"manifest": &p.config.ManifestPath,
 		"box_name": &p.config.BoxName,
@@ -79,7 +81,14 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 	if err != nil {
 		errs = packer.MultiErrorAppend(errs, err)
 	}
-	p.s3 = s3.New(auth, aws.USEast).Bucket(p.config.Bucket)
+
+	// determine region
+	region, valid := aws.Regions[p.config.Region]
+	if valid {
+		p.s3 = s3.New(auth, region).Bucket(p.config.Bucket)
+	} else {
+		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Invalid region specified: %s", p.config.Region))
+	}
 
 	if len(errs.Errors) > 0 {
 		return errs

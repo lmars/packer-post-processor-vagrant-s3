@@ -24,6 +24,10 @@ func (a *Artifact) String() string {
 	return fmt.Sprintf("Vagrant manifest url: %s", a.Url)
 }
 
+func (a *Artifact) State(name string) interface{} {
+	return nil
+}
+
 func (a *Artifact) Destroy() error {
 	return nil
 }
