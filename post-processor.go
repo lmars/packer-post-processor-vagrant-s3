@@ -174,17 +174,18 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 		ui.Message("Uploading...")
 
-		const chunkSize = 5*1024*1024
+		const chunkSize = 10*1024*1024
 
 		totalParts := uint64(math.Ceil(float64(size) / float64(chunkSize)))
+		totalUploadSize := int64(0)
 
 		parts := []s3.Part{}
 
 		errorCount := 0;
 
-		for partNum := uint64(1); partNum < totalParts; partNum++ {
+		for partNum := uint64(1); partNum <= totalParts; partNum++ {
 
-			partSize := int64(math.Min(chunkSize, float64(size-int64(partNum*chunkSize))))
+			partSize := int(math.Min(chunkSize, float64(size-int64(partNum*chunkSize))))
 			partBuffer := make([]byte, partSize)
 
 			ui.Message(fmt.Sprintf("Upload: Uploading part %d, %d (of max %d) bytes", int(partNum), int(partSize), int(chunkSize)))
@@ -195,8 +196,6 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 			bufferReader := bytes.NewReader(partBuffer)
 			part, err := multi.PutPart(int(partNum), bufferReader)
 
-			ui.Message(fmt.Sprintf("Upload: done %d of %d, uploaded %d bytes...", int(partNum), int(totalParts), int(part.Size)*int(partNum)))
-
 			parts = append(parts, part)
 
 			if err != nil {
@@ -205,11 +204,15 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 					errorCount++
 					ui.Message(fmt.Sprintf("Error encountered! %s. Retry %d", err, errorCount))
 					time.Sleep(2000 * time.Millisecond)
-					partNum++
+					partNum--
 				} else {
+					ui.Message(fmt.Sprintf("Too many errors encountered! Aborting.", err, errorCount))
 					return nil, false, err
 				}
 			}
+
+			totalUploadSize += part.Size
+			ui.Message(fmt.Sprintf("Upload: done %d of %d, uploaded %d bytes...", int(partNum), int(totalParts), int(totalUploadSize)))
 
 		}
 
