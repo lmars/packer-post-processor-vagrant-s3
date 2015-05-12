@@ -173,7 +173,9 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		}
 
 		ui.Message("Uploading...")
-		chunkSize := uint64(5*1024*1024)
+
+		const chunkSize = 5*1024*1024
+
 		totalParts := uint64(math.Ceil(float64(size) / float64(chunkSize)))
 
 		parts := []s3.Part{}
@@ -182,21 +184,28 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 		for partNum := uint64(1); partNum < totalParts; partNum++ {
 
-			partSize := int(math.Min(float64(chunkSize), float64(size-int64(partNum*chunkSize))))
+			partSize := int64(math.Min(chunkSize, float64(size-int64(partNum*chunkSize))))
 			partBuffer := make([]byte, partSize)
 
-			file.Read(partBuffer)
-			part, err := multi.PutPart(int(partNum), file)
+			ui.Message(fmt.Sprintf("Upload: Uploading part %d, %d (of max %d) bytes", int(partNum), int(partSize), int(chunkSize)))
 
-			ui.Message(fmt.Sprintf("Upload: %d of %d, uploaded %d bytes...", int(partNum), int(totalParts), int(part.Size)*int(partNum)))
+		  readBytes, err := file.Read(partBuffer)
+			ui.Message(fmt.Sprintf("Upload: Read %d bytes from box file on disk", readBytes))
+
+			bufferReader := bytes.NewReader(partBuffer)
+			part, err := multi.PutPart(int(partNum), bufferReader)
+
+			ui.Message(fmt.Sprintf("Upload: done %d of %d, uploaded %d bytes...", int(partNum), int(totalParts), int(part.Size)*int(partNum)))
 
 			parts = append(parts, part)
 
 			if err != nil {
 
 				if errorCount < 10 {
-					time.Sleep(100 * time.Millisecond)
-					partNum--
+					errorCount++
+					ui.Message(fmt.Sprintf("Error encountered! %s. Retry %d", err, errorCount))
+					time.Sleep(2000 * time.Millisecond)
+					partNum++
 				} else {
 					return nil, false, err
 				}
