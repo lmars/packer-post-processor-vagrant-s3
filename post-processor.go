@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"math"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/s3"
@@ -164,14 +166,44 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	}
 	if size > 100*1024*1024 {
 		ui.Message("File size > 100MB. Initiating multipart upload")
-		multi, err := p.s3.Multi(boxPath, "application/octet-stream", p.config.ACL)
+
+		multi, err := p.s3.InitMulti(boxPath, "application/octet-stream", p.config.ACL)
 		if err != nil {
 			return nil, false, err
 		}
-		parts, err := multi.PutAll(file, 5*1024*1024)
-		if err != nil {
-			return nil, false, err
+
+		ui.Message("Uploading...")
+		chunkSize := uint64(5*1024*1024)
+		totalParts := uint64(math.Ceil(float64(size) / float64(chunkSize)))
+
+		parts := []s3.Part{}
+
+		errorCount := 0;
+
+		for partNum := uint64(1); partNum < totalParts; partNum++ {
+
+			partSize := int(math.Min(float64(chunkSize), float64(size-int64(partNum*chunkSize))))
+			partBuffer := make([]byte, partSize)
+
+			file.Read(partBuffer)
+			part, err := multi.PutPart(int(partNum), file)
+
+			ui.Message(fmt.Sprintf("Upload: %d of %d, uploaded %d bytes...", int(partNum), int(totalParts), int(part.Size)*int(partNum)))
+
+			parts = append(parts, part)
+
+			if err != nil {
+
+				if errorCount < 10 {
+					time.Sleep(100 * time.Millisecond)
+					partNum--
+				} else {
+					return nil, false, err
+				}
+			}
+
 		}
+
 		if err := multi.Complete(parts); err != nil {
 			return nil, false, err
 		}
