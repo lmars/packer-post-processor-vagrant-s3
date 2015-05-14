@@ -182,10 +182,11 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 		for partNum := uint64(1); partNum <= totalParts; partNum++ {
 
-			partSize := int(math.Min(chunkSize, float64(size-int64(partNum*chunkSize))))
+			filePos, err := file.Seek(0,1)
+			partSize := int(math.Min(chunkSize, float64(size - filePos)))
 			partBuffer := make([]byte, partSize)
 
-			ui.Message(fmt.Sprintf("Upload: Uploading part %d, %d (of max %d) bytes", int(partNum), int(partSize), int(chunkSize)))
+			ui.Message(fmt.Sprintf("Upload: Uploading part %d of %d, %d (of max %d) bytes", int(partNum), int(totalParts), int(partSize), int(chunkSize)))
 
 		  readBytes, err := file.Read(partBuffer)
 			ui.Message(fmt.Sprintf("Upload: Read %d bytes from box file on disk", readBytes))
@@ -209,7 +210,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 			}
 
 			totalUploadSize += part.Size
-			ui.Message(fmt.Sprintf("Upload: done %d of %d, uploaded %d bytes...", int(partNum), int(totalParts), int(totalUploadSize)))
+			ui.Message(fmt.Sprintf("Upload: Finished part %d of %d, upload total is %d bytes. This part was %d bytes.", int(partNum), int(totalParts), int(totalUploadSize), int(part.Size)))
 
 		}
 
