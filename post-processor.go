@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"math"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/s3"
@@ -161,14 +163,60 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	}
 	if size > 100*1024*1024 {
 		ui.Message("File size > 100MB. Initiating multipart upload")
-		multi, err := p.s3.Multi(boxPath, "application/octet-stream", "public-read")
+
+		multi, err := p.s3.InitMulti(boxPath, "application/octet-stream", "public-read")
 		if err != nil {
 			return nil, false, err
 		}
-		parts, err := multi.PutAll(file, 5*1024*1024)
-		if err != nil {
-			return nil, false, err
+
+		ui.Message("Uploading...")
+
+		const chunkSize = 10*1024*1024
+
+		totalParts := uint64(math.Ceil(float64(size) / float64(chunkSize)))
+		totalUploadSize := int64(0)
+
+		parts := []s3.Part{}
+
+		errorCount := 0
+
+		for partNum := uint64(1); partNum <= totalParts; partNum++ {
+
+			filePos, err := file.Seek(0,1)
+			
+			partSize := int64(math.Min(chunkSize, float64(size - filePos)))
+			partBuffer := make([]byte, partSize)
+
+			ui.Message(fmt.Sprintf("Upload: Uploading part %d of %d, %d (of max %d) bytes", int(partNum), int(totalParts), int(partSize), int(chunkSize)))
+
+		  	readBytes, err := file.Read(partBuffer)
+			ui.Message(fmt.Sprintf("Upload: Read %d bytes from box file on disk", readBytes))
+
+			bufferReader := bytes.NewReader(partBuffer)
+			part, err := multi.PutPart(int(partNum), bufferReader)
+
+			parts = append(parts, part)
+
+			if err != nil {
+
+				if errorCount < 10 {
+					errorCount++
+					ui.Message(fmt.Sprintf("Error encountered! %s. Retry %d.", err, errorCount))
+					time.Sleep(5 * time.Second)
+					//reset seek position to the beginning of this block
+					file.Seek(filePos, 0)
+					partNum--
+				} else {
+					ui.Message(fmt.Sprintf("Too many errors encountered! Aborting.", err, errorCount))
+					return nil, false, err
+				}
+			} else {
+
+				totalUploadSize += part.Size
+				ui.Message(fmt.Sprintf("Upload: Finished part %d of %d, upload total is %d bytes. This part was %d bytes.", int(partNum), int(totalParts), int(totalUploadSize), int(part.Size)))
+			}
 		}
+
 		if err := multi.Complete(parts); err != nil {
 			return nil, false, err
 		}
