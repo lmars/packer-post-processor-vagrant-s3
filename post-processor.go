@@ -178,17 +178,18 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 		parts := []s3.Part{}
 
-		errorCount := 0;
+		errorCount := 0
 
 		for partNum := uint64(1); partNum <= totalParts; partNum++ {
 
 			filePos, err := file.Seek(0,1)
-			partSize := int(math.Min(chunkSize, float64(size - filePos)))
+			
+			partSize := int64(math.Min(chunkSize, float64(size - filePos)))
 			partBuffer := make([]byte, partSize)
 
 			ui.Message(fmt.Sprintf("Upload: Uploading part %d of %d, %d (of max %d) bytes", int(partNum), int(totalParts), int(partSize), int(chunkSize)))
 
-		  readBytes, err := file.Read(partBuffer)
+		  	readBytes, err := file.Read(partBuffer)
 			ui.Message(fmt.Sprintf("Upload: Read %d bytes from box file on disk", readBytes))
 
 			bufferReader := bytes.NewReader(partBuffer)
@@ -200,18 +201,20 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 				if errorCount < 10 {
 					errorCount++
-					ui.Message(fmt.Sprintf("Error encountered! %s. Retry %d", err, errorCount))
-					time.Sleep(2000 * time.Millisecond)
+					ui.Message(fmt.Sprintf("Error encountered! %s. Retry %d.", err, errorCount))
+					time.Sleep(5 * time.Second)
+					//reset seek position to the beginning of this block
+					file.Seek(filePos - partSize, 0)
 					partNum--
 				} else {
 					ui.Message(fmt.Sprintf("Too many errors encountered! Aborting.", err, errorCount))
 					return nil, false, err
 				}
+			} else {
+
+				totalUploadSize += part.Size
+				ui.Message(fmt.Sprintf("Upload: Finished part %d of %d, upload total is %d bytes. This part was %d bytes.", int(partNum), int(totalParts), int(totalUploadSize), int(part.Size)))
 			}
-
-			totalUploadSize += part.Size
-			ui.Message(fmt.Sprintf("Upload: Finished part %d of %d, upload total is %d bytes. This part was %d bytes.", int(partNum), int(totalParts), int(totalUploadSize), int(part.Size)))
-
 		}
 
 		if err := multi.Complete(parts); err != nil {
