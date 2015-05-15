@@ -179,7 +179,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		totalParts := uint64(math.Ceil(float64(size) / float64(chunkSize)))
 		totalUploadSize := int64(0)
 
-		parts := []s3.Part{}
+		parts := make([]s3.Part, totalParts)
 
 		errorCount := 0
 
