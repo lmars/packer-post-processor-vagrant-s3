@@ -207,7 +207,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 					ui.Message(fmt.Sprintf("Error encountered! %s. Retry %d.", err, errorCount))
 					time.Sleep(5 * time.Second)
 					//reset seek position to the beginning of this block
-					file.Seek(filePos - partSize, 0)
+					file.Seek(filePos, 0)
 					partNum--
 				} else {
 					ui.Message(fmt.Sprintf("Too many errors encountered! Aborting.", err, errorCount))
