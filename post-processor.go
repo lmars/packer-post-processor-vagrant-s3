@@ -220,7 +220,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 			}
 		}
 
-		ui.Message('Parts uploaded, completing upload...')
+		ui.Message("Parts uploaded, completing upload...")
 		if err := multi.Complete(parts); err != nil {
 			return nil, false, err
 		}
