@@ -174,31 +174,31 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 		ui.Message("Uploading...")
 
-		const chunkSize = 10*1024*1024
+		const chunkSize = 5*1024*1024
 
-		totalParts := uint64(math.Ceil(float64(size) / float64(chunkSize)))
+		totalParts := int(math.Ceil(float64(size) / float64(chunkSize)))
 		totalUploadSize := int64(0)
 
 		parts := make([]s3.Part, totalParts)
 
 		errorCount := 0
 
-		for partNum := uint64(1); partNum <= totalParts; partNum++ {
+		for partNum := int(1); partNum <= totalParts; partNum++ {
 
 			filePos, err := file.Seek(0,1)
 			
 			partSize := int64(math.Min(chunkSize, float64(size - filePos)))
 			partBuffer := make([]byte, partSize)
 
-			ui.Message(fmt.Sprintf("Upload: Uploading part %d of %d, %d (of max %d) bytes", int(partNum), int(totalParts), int(partSize), int(chunkSize)))
+			ui.Message(fmt.Sprintf("Upload: Uploading part %d of %d, %d (of max %d) bytes", partNum, int(totalParts), int(partSize), int(chunkSize)))
 
 		  	readBytes, err := file.Read(partBuffer)
 			ui.Message(fmt.Sprintf("Upload: Read %d bytes from box file on disk", readBytes))
 
 			bufferReader := bytes.NewReader(partBuffer)
-			part, err := multi.PutPart(int(partNum), bufferReader)
+			part, err := multi.PutPart(partNum, bufferReader)
 
-			parts = append(parts, part)
+			parts[partNum - 1] = part
 
 			if err != nil {
 
@@ -216,10 +216,11 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 			} else {
 
 				totalUploadSize += part.Size
-				ui.Message(fmt.Sprintf("Upload: Finished part %d of %d, upload total is %d bytes. This part was %d bytes.", int(partNum), int(totalParts), int(totalUploadSize), int(part.Size)))
+				ui.Message(fmt.Sprintf("Upload: Finished part %d of %d, upload total is %d bytes. This part was %d bytes.", partNum, totalParts, int(totalUploadSize), int(part.Size)))
 			}
 		}
 
+		ui.Message('Parts uploaded, completing upload...')
 		if err := multi.Complete(parts); err != nil {
 			return nil, false, err
 		}
