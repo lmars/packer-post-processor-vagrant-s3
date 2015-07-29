@@ -25,6 +25,7 @@ type Config struct {
 	BoxName      string `mapstructure:"box_name"`
 	BoxDir       string `mapstructure:"box_dir"`
 	Version      string `mapstructure:"version"`
+	ACL          s3.ACL `mapstructure:"acl"`
 
 	common.PackerConfig    `mapstructure:",squash"`
 	awscommon.AccessConfig `mapstructure:",squash"`
@@ -88,6 +89,10 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 		p.s3 = s3.New(auth, region).Bucket(p.config.Bucket)
 	} else {
 		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Invalid region specified: %s", p.config.Region))
+	}
+
+	if p.config.ACL == "" {
+		p.config.ACL = "public-read"
 	}
 
 	if len(errs.Errors) > 0 {
@@ -161,7 +166,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	}
 	if size > 100*1024*1024 {
 		ui.Message("File size > 100MB. Initiating multipart upload")
-		multi, err := p.s3.Multi(boxPath, "application/octet-stream", "public-read")
+		multi, err := p.s3.Multi(boxPath, "application/octet-stream", p.config.ACL)
 		if err != nil {
 			return nil, false, err
 		}
@@ -173,7 +178,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 			return nil, false, err
 		}
 	} else {
-		if err := p.s3.PutReader(boxPath, file, size, "application/octet-stream", "public-read"); err != nil {
+		if err := p.s3.PutReader(boxPath, file, size, "application/octet-stream", p.config.ACL); err != nil {
 			return nil, false, err
 		}
 	}
@@ -208,7 +213,7 @@ func (p *PostProcessor) putManifest(manifest *Manifest) error {
 	if err := json.NewEncoder(&buf).Encode(manifest); err != nil {
 		return err
 	}
-	if err := p.s3.Put(p.config.ManifestPath, buf.Bytes(), "application/json", "public-read"); err != nil {
+	if err := p.s3.Put(p.config.ManifestPath, buf.Bytes(), "application/json", p.config.ACL); err != nil {
 		return err
 	}
 	return nil
