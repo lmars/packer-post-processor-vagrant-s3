@@ -112,6 +112,21 @@ The version of the box you are uploading. The box will be uploaded to a S3 direc
 
 Only one box can be uploaded per provider for a given version. If you are building an updated box, you should bump this version, meaning users of your box will be made aware of the new version.
 
+### acl (optional)
+
+An access control setting for the uploaded files (both the manifest and box files).
+
+Valid values:
+
+* private
+* public-read
+* public-read-write (not recommended)
+* authenticated-read
+* bucket-owner-read
+* bucket-owner-full-control
+
+If not set, will use `public-read`.
+
 ### access_key (optional)
 
 Your AWS access key.
