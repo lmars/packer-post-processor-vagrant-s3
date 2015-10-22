@@ -13,9 +13,10 @@ import (
 
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/s3"
-	awscommon "github.com/mitchellh/packer/builder/amazon/common"
 	"github.com/mitchellh/packer/common"
+	"github.com/mitchellh/packer/helper/config"
 	"github.com/mitchellh/packer/packer"
+	"github.com/mitchellh/packer/template/interpolate"
 )
 
 type Config struct {
@@ -26,10 +27,11 @@ type Config struct {
 	BoxDir       string `mapstructure:"box_dir"`
 	Version      string `mapstructure:"version"`
 	ACL          s3.ACL `mapstructure:"acl"`
-
+	AccessKey    string `mapstructure:"access_key_id"`
+	SecretKey    string `mapstructure:"secret_key"`
 	common.PackerConfig    `mapstructure:",squash"`
-	awscommon.AccessConfig `mapstructure:",squash"`
-	tpl                    *packer.ConfigTemplate
+
+	ctx          interpolate.Context
 }
 
 type PostProcessor struct {
@@ -38,21 +40,18 @@ type PostProcessor struct {
 }
 
 func (p *PostProcessor) Configure(raws ...interface{}) error {
-	_, err := common.DecodeConfig(&p.config, raws...)
+	err := config.Decode(&p.config, &config.DecodeOpts{
+		Interpolate:        true,
+		InterpolateContext: &p.config.ctx,
+		InterpolateFilter: &interpolate.RenderFilter{
+			Exclude: []string{"output"},
+		},
+	}, raws...)
 	if err != nil {
 		return err
 	}
 
-	p.config.tpl, err = packer.NewConfigTemplate()
-	if err != nil {
-		return err
-	}
-	p.config.tpl.UserVars = p.config.PackerUserVars
-
-	errs := &packer.MultiError{}
-
-	errs = packer.MultiErrorAppend(errs, p.config.AccessConfig.Prepare(p.config.tpl)...)
-
+	errs := new(packer.MultiError)
 	// required configuration
 	templates := map[string]*string{
 		"region":   &p.config.Region,
@@ -71,16 +70,15 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 
 	// Template process
 	for key, ptr := range templates {
-		*ptr, err = p.config.tpl.Process(*ptr, nil)
-		if err != nil {
-			errs = packer.MultiErrorAppend(errs, fmt.Errorf("Error processing %s: %s", key, err))
+		if err = interpolate.Validate(*ptr, &p.config.ctx); err != nil {
+			errs = packer.MultiErrorAppend(
+				errs, fmt.Errorf("Error parsing %s template: %s", key, err))
 		}
 	}
 
-	// setup the s3 bucket
-	auth, err := p.config.AccessConfig.Auth()
+	auth, err := aws.GetAuth(p.config.AccessKey, p.config.SecretKey)
 	if err != nil {
-		errs = packer.MultiErrorAppend(errs, err)
+		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Unable to create Aws Authentication. Try providing keys 'access_key_id' and 'secret_key'"))
 	}
 
 	// determine region
@@ -194,7 +192,8 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 func (p *PostProcessor) getManifest() (*Manifest, error) {
 	body, err := p.s3.GetReader(p.config.ManifestPath)
 	if err != nil {
-		if s3Err, ok := err.(*s3.Error); ok && s3Err.Code == "NoSuchKey" {
+		s3Err, ok := err.(*s3.Error);
+		if  ok && s3Err.Message == "404 Not Found" {
 			return &Manifest{Name: p.config.BoxName}, nil
 		}
 		return nil, err
