@@ -190,15 +190,14 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 }
 
 func (p *PostProcessor) getManifest() (*Manifest, error) {
-	objExists, err := p.s3.Exists(p.config.ManifestPath)
-	if !objExists {
-		return &Manifest{Name: p.config.BoxName}, nil
-	}	
-	
 	body, err := p.s3.GetReader(p.config.ManifestPath)
 	if err != nil {
+		s3Err, ok := err.(*s3.Error);
+		if  ok && s3Err.Code == "NoSuchKey" {
+			return &Manifest{Name: p.config.BoxName}, nil
+		}
 		return nil, err
-	}
+	}	
 	defer body.Close()
 
 	manifest := &Manifest{}
