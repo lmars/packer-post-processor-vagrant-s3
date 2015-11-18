@@ -127,7 +127,7 @@ Valid values:
 
 If not set, will use `public-read`.
 
-### access_key (optional)
+### access_key_id (optional)
 
 Your AWS access key.
 
