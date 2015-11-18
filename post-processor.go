@@ -20,18 +20,18 @@ import (
 )
 
 type Config struct {
-	Region       string `mapstructure:"region"`
-	Bucket       string `mapstructure:"bucket"`
-	ManifestPath string `mapstructure:"manifest"`
-	BoxName      string `mapstructure:"box_name"`
-	BoxDir       string `mapstructure:"box_dir"`
-	Version      string `mapstructure:"version"`
-	ACL          s3.ACL `mapstructure:"acl"`
-	AccessKey    string `mapstructure:"access_key_id"`
-	SecretKey    string `mapstructure:"secret_key"`
-	common.PackerConfig    `mapstructure:",squash"`
+	Region              string `mapstructure:"region"`
+	Bucket              string `mapstructure:"bucket"`
+	ManifestPath        string `mapstructure:"manifest"`
+	BoxName             string `mapstructure:"box_name"`
+	BoxDir              string `mapstructure:"box_dir"`
+	Version             string `mapstructure:"version"`
+	ACL                 s3.ACL `mapstructure:"acl"`
+	AccessKey           string `mapstructure:"access_key_id"`
+	SecretKey           string `mapstructure:"secret_key"`
+	common.PackerConfig `mapstructure:",squash"`
 
-	ctx          interpolate.Context
+	ctx interpolate.Context
 }
 
 type PostProcessor struct {
@@ -192,12 +192,12 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 func (p *PostProcessor) getManifest() (*Manifest, error) {
 	body, err := p.s3.GetReader(p.config.ManifestPath)
 	if err != nil {
-		s3Err, ok := err.(*s3.Error);
-		if  ok && s3Err.Code == "NoSuchKey" {
+		s3Err, ok := err.(*s3.Error)
+		if ok && s3Err.Code == "NoSuchKey" {
 			return &Manifest{Name: p.config.BoxName}, nil
 		}
 		return nil, err
-	}	
+	}
 	defer body.Close()
 
 	manifest := &Manifest{}
