@@ -22,15 +22,16 @@ import (
 )
 
 type Config struct {
-	Region              string `mapstructure:"region"`
-	Bucket              string `mapstructure:"bucket"`
-	ManifestPath        string `mapstructure:"manifest"`
-	BoxName             string `mapstructure:"box_name"`
-	BoxDir              string `mapstructure:"box_dir"`
-	Version             string `mapstructure:"version"`
-	ACL                 s3.ACL `mapstructure:"acl"`
-	AccessKey           string `mapstructure:"access_key_id"`
-	SecretKey           string `mapstructure:"secret_key"`
+	Region              string        `mapstructure:"region"`
+	Bucket              string        `mapstructure:"bucket"`
+	ManifestPath        string        `mapstructure:"manifest"`
+	BoxName             string        `mapstructure:"box_name"`
+	BoxDir              string        `mapstructure:"box_dir"`
+	Version             string        `mapstructure:"version"`
+	ACL                 s3.ACL        `mapstructure:"acl"`
+	AccessKey           string        `mapstructure:"access_key_id"`
+	SecretKey           string        `mapstructure:"secret_key"`
+	SignedExpiry        time.Duration `mapstructure:"signed_expiry"`
 	common.PackerConfig `mapstructure:",squash"`
 
 	ctx interpolate.Context
@@ -150,9 +151,15 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message(fmt.Sprintf("Checksum is %s", checksum))
 
 	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, p.config.Version))
+	var url string
+	if p.config.SignedExpiry == 0 {
+		url = p.s3.URL(boxPath)
+	} else {
+		url = p.s3.SignedURL(boxPath, time.Now().Add(p.config.SignedExpiry))
+	}
 	if err := manifest.add(p.config.Version, &Provider{
 		Name:         provider,
-		Url:          p.s3.URL(boxPath),
+		Url:          url,
 		ChecksumType: "sha256",
 		Checksum:     checksum,
 	}); err != nil {
