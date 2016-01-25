@@ -2,12 +2,12 @@ package main
 
 import (
 	"bytes"
-	"math"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path"
 	"strings"
@@ -22,15 +22,16 @@ import (
 )
 
 type Config struct {
-	Region              string `mapstructure:"region"`
-	Bucket              string `mapstructure:"bucket"`
-	ManifestPath        string `mapstructure:"manifest"`
-	BoxName             string `mapstructure:"box_name"`
-	BoxDir              string `mapstructure:"box_dir"`
-	Version             string `mapstructure:"version"`
-	ACL                 s3.ACL `mapstructure:"acl"`
-	AccessKey           string `mapstructure:"access_key_id"`
-	SecretKey           string `mapstructure:"secret_key"`
+	Region              string        `mapstructure:"region"`
+	Bucket              string        `mapstructure:"bucket"`
+	ManifestPath        string        `mapstructure:"manifest"`
+	BoxName             string        `mapstructure:"box_name"`
+	BoxDir              string        `mapstructure:"box_dir"`
+	Version             string        `mapstructure:"version"`
+	ACL                 s3.ACL        `mapstructure:"acl"`
+	AccessKey           string        `mapstructure:"access_key_id"`
+	SecretKey           string        `mapstructure:"secret_key"`
+	SignedExpiry        time.Duration `mapstructure:"signed_expiry"`
 	common.PackerConfig `mapstructure:",squash"`
 
 	ctx interpolate.Context
@@ -150,9 +151,15 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message(fmt.Sprintf("Checksum is %s", checksum))
 
 	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, p.config.Version))
+	var url string
+	if p.config.SignedExpiry == 0 {
+		url = p.s3.URL(boxPath)
+	} else {
+		url = p.s3.SignedURL(boxPath, time.Now().Add(p.config.SignedExpiry))
+	}
 	if err := manifest.add(p.config.Version, &Provider{
 		Name:         provider,
-		Url:          p.s3.URL(boxPath),
+		Url:          url,
 		ChecksumType: "sha256",
 		Checksum:     checksum,
 	}); err != nil {
@@ -174,7 +181,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 		ui.Message("Uploading...")
 
-		const chunkSize = 5*1024*1024
+		const chunkSize = 5 * 1024 * 1024
 
 		totalParts := int(math.Ceil(float64(size) / float64(chunkSize)))
 		totalUploadSize := int64(0)
@@ -185,20 +192,20 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 		for partNum := int(1); partNum <= totalParts; partNum++ {
 
-			filePos, err := file.Seek(0,1)
-			
-			partSize := int64(math.Min(chunkSize, float64(size - filePos)))
+			filePos, err := file.Seek(0, 1)
+
+			partSize := int64(math.Min(chunkSize, float64(size-filePos)))
 			partBuffer := make([]byte, partSize)
 
 			ui.Message(fmt.Sprintf("Upload: Uploading part %d of %d, %d (of max %d) bytes", partNum, int(totalParts), int(partSize), int(chunkSize)))
 
-		  	readBytes, err := file.Read(partBuffer)
+			readBytes, err := file.Read(partBuffer)
 			ui.Message(fmt.Sprintf("Upload: Read %d bytes from box file on disk", readBytes))
 
 			bufferReader := bytes.NewReader(partBuffer)
 			part, err := multi.PutPart(partNum, bufferReader)
 
-			parts[partNum - 1] = part
+			parts[partNum-1] = part
 
 			if err != nil {
 

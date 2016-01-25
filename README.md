@@ -6,7 +6,7 @@ Uploads built Vagrant boxes to S3 and manages a manifest file for versioned boxe
 Installation
 ------------
 Install the binary (you'll need ```git``` and ```go```):
- 
+
 ```
 $ go get github.com/lmars/packer-post-processor-vagrant-s3
 ```
@@ -60,7 +60,7 @@ and a box:
 
 ```
 https://s3.amazonaws.com/my-s3-bucket/vagrant/boxes/my-cool-project/0.0.1/my-cool-project.box
-  
+
 ```
 
 
@@ -70,7 +70,7 @@ Configuration
 All configuration properties are **required**, except where noted.
 ### region
 
-The S3 region of the bucket (please see next section). 
+The S3 region of the bucket (please see next section).
 
 Valid values:
 
@@ -138,3 +138,10 @@ If not set, will use `AWS_ACCESS_KEY_ID` environment variable.
 Your AWS secret key.
 
 If not set, will use `AWS_SECRET_ACCESS_KEY` environment variable.
+
+### signed_expiry (optional)
+
+If set, generate presigned urls in the manifest valid for a time duration like "60s" or "12h".
+See https://golang.org/pkg/time/#ParseDuration for syntax.
+
+If not set, generate normal s3 urls.
