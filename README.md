@@ -26,7 +26,8 @@ Add the post-processor to your packer template **after** the `vagrant` post-proc
 json
 {
   "variables": {
-    "version": "0.0.1"
+    "version":  "0.0.1"
+    "box_name": "my-cool-project"
   },
   "builders": [ ... ],
   "provisioners": [ ... ],
@@ -40,8 +41,8 @@ json
         "type":     "vagrant-s3",
         "region": "us-east-1",
         "bucket":   "my-s3-bucket",
-        "manifest": "vagrant/manifest.json",
-        "box_name": "my-cool-project",
+        "manifest": "vagrant/json/{{ user `box_name` }}.json",
+        "box_name": "{{ user `box_name` }}",
         "box_dir":  "vagrant/boxes",
         "version":  "{{ user `version` }}"
       }
@@ -54,15 +55,28 @@ json
 The above will result in the following object created in S3, a manifest:
 
 ```
-https://s3.amazonaws.com/my-s3-bucket/vagrant/manifest.json
+https://s3.amazonaws.com/my-s3-bucket/vagrant/json/my-cool-project.json
 ```
+
 and a box:
+
+```
+https://s3.amazonaws.com/my-s3-bucket/vagrant/boxes/0.0.1/my-cool-project.box
+
+```
+
+By setting `box_dir` like this in your `template.json` file:
+
+```
+        "box_dir":  "vagrant/boxes/{{ user `box_name` }}",
+```
+
+Your can have your box version directories, nested underneath another directory named after your box.
 
 ```
 https://s3.amazonaws.com/my-s3-bucket/vagrant/boxes/my-cool-project/0.0.1/my-cool-project.box
 
 ```
-
 
 Configuration
 -------------
