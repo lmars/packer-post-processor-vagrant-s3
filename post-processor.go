@@ -133,13 +133,6 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	size := info.Size()
 	ui.Message(fmt.Sprintf("Box to upload: %s (%d bytes)", box, size))
 
-	// get the latest manifest so we can add to it
-	ui.Message("Fetching latest manifest")
-	manifest, err := p.getManifest()
-	if err != nil {
-		return nil, false, err
-	}
-
 	// generate the path to store the box in S3
 	boxPath := fmt.Sprintf("%s/%s/%s", p.config.BoxDir, p.config.Version, path.Base(box))
 
@@ -149,22 +142,6 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		return nil, false, err
 	}
 	ui.Message(fmt.Sprintf("Checksum is %s", checksum))
-
-	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, p.config.Version))
-	var url string
-	if p.config.SignedExpiry == 0 {
-		url = p.s3.URL(boxPath)
-	} else {
-		url = p.s3.SignedURL(boxPath, time.Now().Add(p.config.SignedExpiry))
-	}
-	if err := manifest.add(p.config.Version, &Provider{
-		Name:         provider,
-		Url:          url,
-		ChecksumType: "sha256",
-		Checksum:     checksum,
-	}); err != nil {
-		return nil, false, err
-	}
 
 	// upload the box to S3 (rewinding as we already read the file to generate the checksum)
 	ui.Message(fmt.Sprintf("Uploading box to S3: %s", boxPath))
@@ -235,6 +212,29 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		if err := p.s3.PutReader(boxPath, file, size, "application/octet-stream", p.config.ACL); err != nil {
 			return nil, false, err
 		}
+	}
+
+	// get the latest manifest so we can add to it
+	ui.Message("Fetching latest manifest")
+	manifest, err := p.getManifest()
+	if err != nil {
+		return nil, false, err
+	}
+
+	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, p.config.Version))
+	var url string
+	if p.config.SignedExpiry == 0 {
+		url = p.s3.URL(boxPath)
+	} else {
+		url = p.s3.SignedURL(boxPath, time.Now().Add(p.config.SignedExpiry))
+	}
+	if err := manifest.add(p.config.Version, &Provider{
+		Name:         provider,
+		Url:          url,
+		ChecksumType: "sha256",
+		Checksum:     checksum,
+	}); err != nil {
+		return nil, false, err
 	}
 
 	ui.Message(fmt.Sprintf("Uploading the manifest: %s", p.config.ManifestPath))
