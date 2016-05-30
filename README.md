@@ -22,8 +22,7 @@ Usage
 
 Add the post-processor to your packer template **after** the `vagrant` post-processor:
 
-```
-json
+```json
 {
   "variables": {
     "version":  "0.0.1"
