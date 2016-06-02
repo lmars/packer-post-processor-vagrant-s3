@@ -25,7 +25,8 @@ Add the post-processor to your packer template **after** the `vagrant` post-proc
 ```json
 {
   "variables": {
-    "version":  "0.0.1"
+    "version":  "0.0.1",
+    "box_organization": "my-organization",
     "box_name": "my-cool-project"
   },
   "builders": [ ... ],
@@ -40,42 +41,36 @@ Add the post-processor to your packer template **after** the `vagrant` post-proc
         "type":     "vagrant-s3",
         "region": "us-east-1",
         "bucket":   "my-s3-bucket",
-        "manifest": "vagrant/json/{{ user `box_name` }}.json",
-        "box_name": "{{ user `box_name` }}",
-        "box_dir":  "vagrant/boxes",
+        "manifest": "vagrant/json/{{ user `box_organization` }}/{{ user `box_name` }}.json",
+        "box_dir":  "vagrant/boxes/{{ user `box_organization` }}/{{ user `box_name` }}",
+        "box_name": "{{ user `box_organization` }}{{ user `box_name` }}",
         "version":  "{{ user `version` }}"
       }
     ]
   ]
 }
 ```
+
 **NOTE:** The post-processors must be a **nested array** (i.e.: a Packer sequence definition) so that they run in order. See the [Packer template documentation](http://www.packer.io/docs/templates/post-processors.html) for more information.
 
-The above will result in the following object created in S3, a manifest:
+The above will result in the following objects being created in S3:
 
 ```
-https://s3.amazonaws.com/my-s3-bucket/vagrant/json/my-cool-project.json
+https://s3.amazonaws.com/my-s3-bucket/vagrant/json/my-organization/my-cool-project.json
+https://s3.amazonaws.com/my-s3-bucket/vagrant/boxes/my-organization/my-cool-project/0.0.1/packer_virtualbox-iso_virtualbox.box
 ```
 
-and a box:
+You can now use point your `Vagrantfile` to the manifest by using something like this:
 
-```
-https://s3.amazonaws.com/my-s3-bucket/vagrant/boxes/0.0.1/my-cool-project.box
-
-```
-
-By setting `box_dir` like this in your `template.json` file:
-
-```
-        "box_dir":  "vagrant/boxes/{{ user `box_name` }}",
+```ruby
+Vagrant.configure(2) do |config|
+  config.vm.box = "my-organization/my-cool-project"
+  config.vm.box_url = "https://s3.amazonaws.com/my-s3-bucket/vagrant/json/my-organization/my-cool-project.json"
+end
 ```
 
-Your can have your box version directories, nested underneath another directory named after your box.
-
-```
-https://s3.amazonaws.com/my-s3-bucket/vagrant/boxes/my-cool-project/0.0.1/my-cool-project.box
-
-```
+When pointing the `Vagrantfile` at a manifest instead of directly at a box you retain traditional features such as 
+versioning and multiple providers.
 
 Configuration
 -------------
