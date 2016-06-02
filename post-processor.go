@@ -194,7 +194,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 					file.Seek(filePos, 0)
 					partNum--
 				} else {
-					ui.Message(fmt.Sprintf("Too many errors encountered! Aborting.", err, errorCount))
+					ui.Message(fmt.Sprintf("Too many errors encountered (%d)! Aborting.", errorCount))
 					return nil, false, err
 				}
 			} else {
