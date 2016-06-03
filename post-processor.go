@@ -137,11 +137,10 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 	if version == "" {
 		// get the next version based on the existing manifest
-		manifest, err := p.getManifest()
-		version = manifest.getNextVersion()
-
-		if err != nil {
+		if manifest, err := p.getManifest(); err != nil {
 			return nil, false, err
+		} else {
+			version = manifest.getNextVersion()
 		}
 
 		ui.Message(fmt.Sprintf("No version defined, using %s as new version", version))

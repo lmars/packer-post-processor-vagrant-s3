@@ -36,13 +36,9 @@ func (m *Manifest) getLatestVersion() string {
 	latestVersion, _ := semver.Make(NoVersion)
 
 	for _, version := range m.Versions {
-		currentVersion, err := semver.Make(version.Version)
-
-		if err != nil {
+		if currentVersion, err := semver.Make(version.Version); err != nil {
 			continue
-		}
-
-		if latestVersion.LT(currentVersion) {
+		} else if latestVersion.LT(currentVersion) {
 			latestVersion = currentVersion
 		}
 	}
