@@ -7,14 +7,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/mitchellh/goamz/aws"
-	"github.com/mitchellh/goamz/s3"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/mitchellh/packer/common"
 	"github.com/mitchellh/packer/helper/config"
 	"github.com/mitchellh/packer/packer"
@@ -28,7 +31,7 @@ type Config struct {
 	BoxName             string        `mapstructure:"box_name"`
 	BoxDir              string        `mapstructure:"box_dir"`
 	Version             string        `mapstructure:"version"`
-	ACL                 s3.ACL        `mapstructure:"acl"`
+	ACL                 string        `mapstructure:"acl"`
 	AccessKey           string        `mapstructure:"access_key_id"`
 	SecretKey           string        `mapstructure:"secret_key"`
 	SignedExpiry        time.Duration `mapstructure:"signed_expiry"`
@@ -38,8 +41,9 @@ type Config struct {
 }
 
 type PostProcessor struct {
-	config Config
-	s3     *s3.Bucket
+	config  Config
+	session *session.Session
+	s3      *s3.S3
 }
 
 func (p *PostProcessor) Configure(raws ...interface{}) error {
@@ -78,17 +82,24 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 		}
 	}
 
-	auth, err := aws.GetAuth(p.config.AccessKey, p.config.SecretKey)
-	if err != nil {
-		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Unable to create Aws Authentication. Try providing keys 'access_key_id' and 'secret_key'"))
-	}
+	// create a session and an S3 service
+	accessKey := p.config.AccessKey
+	secretKey := p.config.SecretKey
 
-	// determine region
-	region, valid := aws.Regions[p.config.Region]
-	if valid {
-		p.s3 = s3.New(auth, region).Bucket(p.config.Bucket)
-	} else {
-		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Invalid region specified: %s", p.config.Region))
+	p.session = session.New(&aws.Config{
+		Region:      aws.String(p.config.Region),
+		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
+	})
+
+	p.s3 = s3.New(p.session)
+
+	// check that we have permission to access the bucket
+	_, err = p.s3.HeadBucket(&s3.HeadBucketInput{
+		Bucket: aws.String(p.config.Bucket),
+	})
+
+	if err != nil {
+		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Unable to access the bucket %s, make sure your credentials are valid and have sufficient permissions", p.config.Region))
 	}
 
 	if p.config.ACL == "" {
@@ -117,114 +128,36 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	provider := providerFromBuilderName(artifact.Id())
 	ui.Say(fmt.Sprintf("Preparing to upload box for '%s' provider to S3 bucket '%s'", provider, p.config.Bucket))
 
-	// open the box so we can upload to S3 and calculate checksum for the manifest
-	file, err := os.Open(box)
+	// determine box size
+	boxStat, err := os.Stat(box)
 	if err != nil {
 		return nil, false, err
 	}
-	defer file.Close()
-
-	// get the file's size
-	info, err := file.Stat()
-	if err != nil {
-		return nil, false, err
-	}
-	size := info.Size()
-	ui.Message(fmt.Sprintf("Box to upload: %s (%d bytes)", box, size))
+	ui.Message(fmt.Sprintf("Box to upload: %s (%d bytes)", box, boxStat.Size()))
 
 	// determine version
-	version := p.config.Version
-
-	if version == "" {
-		// get the next version based on the existing manifest
-		if manifest, err := p.getManifest(); err != nil {
-			return nil, false, err
-		} else {
-			version = manifest.getNextVersion()
-		}
-
-		ui.Message(fmt.Sprintf("No version defined, using %s as new version", version))
+	version, err := p.determineVersion(p.config.Version)
+	if err != nil {
+		return nil, false, err
 	}
+	ui.Message(fmt.Sprintf("No version defined, using %s as new version", version))
 
 	// generate the path to store the box in S3
 	boxPath := fmt.Sprintf("%s/%s/%s", p.config.BoxDir, version, path.Base(box))
 
 	ui.Message("Generating checksum")
-	checksum, err := sum256(file)
+	checksum, err := sum256(box)
 	if err != nil {
 		return nil, false, err
 	}
 	ui.Message(fmt.Sprintf("Checksum is %s", checksum))
 
-	// upload the box to S3 (rewinding as we already read the file to generate the checksum)
+	// upload the box to S3
 	ui.Message(fmt.Sprintf("Uploading box to S3: %s", boxPath))
-	if _, err := file.Seek(0, 0); err != nil {
+	err = p.uploadBox(box, boxPath)
+
+	if err != nil {
 		return nil, false, err
-	}
-	if size > 100*1024*1024 {
-		ui.Message("File size > 100MB. Initiating multipart upload")
-
-		multi, err := p.s3.InitMulti(boxPath, "application/octet-stream", p.config.ACL)
-		if err != nil {
-			return nil, false, err
-		}
-
-		ui.Message("Uploading...")
-
-		const chunkSize = 5 * 1024 * 1024
-
-		totalParts := int(math.Ceil(float64(size) / float64(chunkSize)))
-		totalUploadSize := int64(0)
-
-		parts := make([]s3.Part, totalParts)
-
-		errorCount := 0
-
-		for partNum := int(1); partNum <= totalParts; partNum++ {
-
-			filePos, err := file.Seek(0, 1)
-
-			partSize := int64(math.Min(chunkSize, float64(size-filePos)))
-			partBuffer := make([]byte, partSize)
-
-			ui.Message(fmt.Sprintf("Upload: Uploading part %d of %d, %d (of max %d) bytes", partNum, int(totalParts), int(partSize), int(chunkSize)))
-
-			readBytes, err := file.Read(partBuffer)
-			ui.Message(fmt.Sprintf("Upload: Read %d bytes from box file on disk", readBytes))
-
-			bufferReader := bytes.NewReader(partBuffer)
-			part, err := multi.PutPart(partNum, bufferReader)
-
-			parts[partNum-1] = part
-
-			if err != nil {
-
-				if errorCount < 10 {
-					errorCount++
-					ui.Message(fmt.Sprintf("Error encountered! %s. Retry %d.", err, errorCount))
-					time.Sleep(5 * time.Second)
-					//reset seek position to the beginning of this block
-					file.Seek(filePos, 0)
-					partNum--
-				} else {
-					ui.Message(fmt.Sprintf("Too many errors encountered (%d)! Aborting.", errorCount))
-					return nil, false, err
-				}
-			} else {
-
-				totalUploadSize += part.Size
-				ui.Message(fmt.Sprintf("Upload: Finished part %d of %d, upload total is %d bytes. This part was %d bytes.", partNum, totalParts, int(totalUploadSize), int(part.Size)))
-			}
-		}
-
-		ui.Message("Parts uploaded, completing upload...")
-		if err := multi.Complete(parts); err != nil {
-			return nil, false, err
-		}
-	} else {
-		if err := p.s3.PutReader(boxPath, file, size, "application/octet-stream", p.config.ACL); err != nil {
-			return nil, false, err
-		}
 	}
 
 	// get the latest manifest so we can add to it
@@ -237,9 +170,19 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, version))
 	var url string
 	if p.config.SignedExpiry == 0 {
-		url = p.s3.URL(boxPath)
+		url = generateS3Url(p.config.Region, p.config.Bucket, boxPath)
 	} else {
-		url = p.s3.SignedURL(boxPath, time.Now().Add(p.config.SignedExpiry))
+		// fetch the new object
+		boxObject, _ := p.s3.GetObjectRequest(&s3.GetObjectInput{
+			Bucket: aws.String(p.config.Bucket),
+			Key:    aws.String(boxPath),
+		})
+
+		url, err = boxObject.Presign(p.config.SignedExpiry)
+
+		if err != nil {
+			return nil, false, err
+		}
 	}
 	if err := manifest.add(version, &Provider{
 		Name:         provider,
@@ -255,22 +198,66 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		return nil, false, err
 	}
 
-	return &Artifact{p.s3.URL(p.config.ManifestPath)}, true, nil
+	return &Artifact{generateS3Url(p.config.Region, p.config.Bucket, p.config.ManifestPath)}, true, nil
+}
+
+func (p *PostProcessor) determineVersion(configVersion string) (string, error) {
+	version := configVersion
+
+	if version == "" {
+		// get the next version based on the existing manifest
+		if manifest, err := p.getManifest(); err != nil {
+			return "", err
+		} else {
+			version = manifest.getNextVersion()
+		}
+	}
+
+	return version, nil
+}
+
+func (p *PostProcessor) uploadBox(box, boxPath string) error {
+	// open the file for reading
+	file, err := os.Open(box)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// upload the file
+	uploader := s3manager.NewUploader(p.session, func(u *s3manager.Uploader) {
+		u.PartSize = 1024 * 1024 * 64
+	})
+
+	_, err = uploader.Upload(&s3manager.UploadInput{
+		Body:   file,
+		Bucket: aws.String(p.config.Bucket),
+		Key:    aws.String(boxPath),
+		ACL:    aws.String(p.config.ACL),
+	})
+
+	return err
 }
 
 func (p *PostProcessor) getManifest() (*Manifest, error) {
-	body, err := p.s3.GetReader(p.config.ManifestPath)
+	result, err := p.s3.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(p.config.Bucket),
+		Key:    aws.String(p.config.ManifestPath),
+	})
+
 	if err != nil {
-		s3Err, ok := err.(*s3.Error)
-		if ok && s3Err.Code == "NoSuchKey" {
-			return &Manifest{Name: p.config.BoxName}, nil
+		if awsErr, ok := err.(awserr.Error); ok {
+			if awsErr.Code() == "NoSuchKey" {
+				return &Manifest{Name: p.config.BoxName}, nil
+			}
 		}
 		return nil, err
 	}
-	defer body.Close()
+
+	defer result.Body.Close()
 
 	manifest := &Manifest{}
-	if err := json.NewDecoder(body).Decode(manifest); err != nil {
+	if err := json.NewDecoder(result.Body).Decode(manifest); err != nil {
 		return nil, err
 	}
 	return manifest, nil
@@ -281,14 +268,37 @@ func (p *PostProcessor) putManifest(manifest *Manifest) error {
 	if err := json.NewEncoder(&buf).Encode(manifest); err != nil {
 		return err
 	}
-	if err := p.s3.Put(p.config.ManifestPath, buf.Bytes(), "application/json", p.config.ACL); err != nil {
+
+	_, err := p.s3.PutObject(&s3.PutObjectInput{
+		Body:        strings.NewReader(buf.String()),
+		Bucket:      aws.String(p.config.Bucket),
+		Key:         aws.String(p.config.ManifestPath),
+		ContentType: aws.String("application/json"),
+		ACL:         aws.String(p.config.ACL),
+	})
+
+	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
+func generateS3Url(region, bucket, key string) string {
+	return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", region, bucket, key)
+}
+
 // calculates a sha256 checksum of the file
-func sum256(file *os.File) (string, error) {
+func sum256(filePath string) (string, error) {
+	// open the file for reading
+	file, err := os.Open(filePath)
+
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+
 	h := sha256.New()
 	if _, err := io.Copy(h, file); err != nil {
 		return "", err
