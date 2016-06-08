@@ -62,7 +62,6 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 		"manifest": &p.config.ManifestPath,
 		"box_name": &p.config.BoxName,
 		"box_dir":  &p.config.BoxDir,
-		"version":  &p.config.Version,
 	}
 
 	for key, ptr := range templates {
@@ -133,8 +132,22 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	size := info.Size()
 	ui.Message(fmt.Sprintf("Box to upload: %s (%d bytes)", box, size))
 
+	// determine version
+	version := p.config.Version
+
+	if version == "" {
+		// get the next version based on the existing manifest
+		if manifest, err := p.getManifest(); err != nil {
+			return nil, false, err
+		} else {
+			version = manifest.getNextVersion()
+		}
+
+		ui.Message(fmt.Sprintf("No version defined, using %s as new version", version))
+	}
+
 	// generate the path to store the box in S3
-	boxPath := fmt.Sprintf("%s/%s/%s", p.config.BoxDir, p.config.Version, path.Base(box))
+	boxPath := fmt.Sprintf("%s/%s/%s", p.config.BoxDir, version, path.Base(box))
 
 	ui.Message("Generating checksum")
 	checksum, err := sum256(file)
@@ -194,7 +207,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 					file.Seek(filePos, 0)
 					partNum--
 				} else {
-					ui.Message(fmt.Sprintf("Too many errors encountered! Aborting.", err, errorCount))
+					ui.Message(fmt.Sprintf("Too many errors encountered (%d)! Aborting.", errorCount))
 					return nil, false, err
 				}
 			} else {
@@ -221,14 +234,14 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		return nil, false, err
 	}
 
-	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, p.config.Version))
+	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, version))
 	var url string
 	if p.config.SignedExpiry == 0 {
 		url = p.s3.URL(boxPath)
 	} else {
 		url = p.s3.SignedURL(boxPath, time.Now().Add(p.config.SignedExpiry))
 	}
-	if err := manifest.add(p.config.Version, &Provider{
+	if err := manifest.add(version, &Provider{
 		Name:         provider,
 		Url:          url,
 		ChecksumType: "sha256",

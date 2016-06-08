@@ -1,6 +1,12 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/blang/semver"
+)
+
+const NoVersion = "0.0.0"
 
 type Manifest struct {
 	Name     string     `json:"name"`
@@ -24,6 +30,28 @@ func (m *Manifest) add(version string, provider *Provider) error {
 		Providers: []*Provider{provider},
 	})
 	return nil
+}
+
+func (m *Manifest) getLatestVersion() string {
+	latestVersion, _ := semver.Make(NoVersion)
+
+	for _, version := range m.Versions {
+		if currentVersion, err := semver.Make(version.Version); err != nil {
+			continue
+		} else if latestVersion.LT(currentVersion) {
+			latestVersion = currentVersion
+		}
+	}
+
+	return latestVersion.String()
+}
+
+func (m *Manifest) getNextVersion() string {
+	latestVersion, _ := semver.Make(m.getLatestVersion())
+	latestVersion.Minor++
+	latestVersion.Patch = 0
+
+	return latestVersion.String()
 }
 
 type Version struct {

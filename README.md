@@ -114,11 +114,13 @@ This is what users of your box will set `vm.config.box` to in their `Vagrantfile
 
 The path to a directory in your bucket to store boxes in (e.g. `vagrant/boxes`).
 
-### version
+### version (optional)
 
 The version of the box you are uploading. The box will be uploaded to a S3 directory path that includes the version number (e.g. `vagrant/boxes/<version>`).
 
 Only one box can be uploaded per provider for a given version. If you are building an updated box, you should bump this version, meaning users of your box will be made aware of the new version.
+
+You may also omit `version` completely, in which case the version will automatically be bumped to the next minor revision (e.g. if you have versions `0.0.1` and `0.0.2` in your manifest the new version will become `0.1.0`).
 
 ### acl (optional)
 
