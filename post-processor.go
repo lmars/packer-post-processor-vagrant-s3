@@ -136,11 +136,18 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message(fmt.Sprintf("Box to upload: %s (%d bytes)", box, boxStat.Size()))
 
 	// determine version
-	version, err := p.determineVersion(p.config.Version)
-	if err != nil {
-		return nil, false, err
+	version := p.config.Version
+
+	if version == "" {
+		version, err = p.determineVersion()
+		if err != nil {
+			return nil, false, err
+		}
+
+		ui.Message(fmt.Sprintf("No version defined, using %s as new version", version))
+	} else {
+		ui.Message(fmt.Sprintf("Using %s as new version", version))
 	}
-	ui.Message(fmt.Sprintf("No version defined, using %s as new version", version))
 
 	// generate the path to store the box in S3
 	boxPath := fmt.Sprintf("%s/%s/%s", p.config.BoxDir, version, path.Base(box))
@@ -201,19 +208,13 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	return &Artifact{generateS3Url(p.config.Region, p.config.Bucket, p.config.ManifestPath)}, true, nil
 }
 
-func (p *PostProcessor) determineVersion(configVersion string) (string, error) {
-	version := configVersion
-
-	if version == "" {
-		// get the next version based on the existing manifest
-		if manifest, err := p.getManifest(); err != nil {
-			return "", err
-		} else {
-			version = manifest.getNextVersion()
-		}
+func (p *PostProcessor) determineVersion() (string, error) {
+	// get the next version based on the existing manifest
+	if manifest, err := p.getManifest(); err != nil {
+		return "", err
+	} else {
+		return manifest.getNextVersion(), nil
 	}
-
-	return version, nil
 }
 
 func (p *PostProcessor) uploadBox(box, boxPath string) error {
