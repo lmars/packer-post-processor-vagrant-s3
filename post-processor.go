@@ -83,7 +83,7 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 	}
 
 	var cred *credentials.Credentials = nil // nil credentials use the default aws sdk credential chain
-	// Setting either config variable indicates an attempt to use configred credentials
+	// Setting either credential config variable indicates an attempt to use configured credentials
 	if p.config.AccessKey != "" || p.config.SecretKey != "" {
 		cred = credentials.NewCredentials(&credentials.StaticProvider{
 			Value: credentials.Value{
