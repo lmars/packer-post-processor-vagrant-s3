@@ -82,13 +82,20 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 		}
 	}
 
-	// create a session and an S3 service
-	accessKey := p.config.AccessKey
-	secretKey := p.config.SecretKey
-
+	var cred *credentials.Credentials = nil // nil credentials use the default aws sdk credential chain
+	// Setting either config variable indicates an attempt to use configred credentials
+	if p.config.AccessKey != "" || p.config.SecretKey != "" {
+		cred = credentials.NewCredentials(&credentials.StaticProvider{
+			Value: credentials.Value{
+				AccessKeyID:     p.config.AccessKey,
+				SecretAccessKey: p.config.SecretKey,
+				ProviderName:    "plugin-conf",
+			},
+		})
+	}
 	p.session = session.New(&aws.Config{
 		Region:      aws.String(p.config.Region),
-		Credentials: credentials.NewStaticCredentials(accessKey, secretKey, ""),
+		Credentials: cred,
 	})
 
 	p.s3 = s3.New(p.session)
