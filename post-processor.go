@@ -106,6 +106,10 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 		p.config.ACL = "public-read"
 	}
 
+	if p.config.Region == "us-east-1" {
+		p.config.Region = ""
+	}
+
 	if len(errs.Errors) > 0 {
 		return errs
 	}
@@ -285,7 +289,8 @@ func (p *PostProcessor) putManifest(manifest *Manifest) error {
 }
 
 func generateS3Url(region, bucket, key string) string {
-	return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", region, bucket, key)
+	regionString = fmt.Sprintf("-%s", region)
+	return fmt.Sprintf("https://s3%s.amazonaws.com/%s/%s", regionString, bucket, key)
 }
 
 // calculates a sha256 checksum of the file
