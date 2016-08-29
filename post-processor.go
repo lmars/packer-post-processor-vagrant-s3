@@ -285,7 +285,11 @@ func (p *PostProcessor) putManifest(manifest *Manifest) error {
 }
 
 func generateS3Url(region, bucket, key string) string {
-	return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", region, bucket, key)
+	if region == "us-east-1" {
+		return fmt.Sprintf("https://s3.amazonaws.com/%s/%s", bucket, key)
+	} else {
+		return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", region, bucket, key)
+	}
 }
 
 // calculates a sha256 checksum of the file
