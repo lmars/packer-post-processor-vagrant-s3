@@ -69,7 +69,7 @@ Vagrant.configure(2) do |config|
 end
 ```
 
-When pointing the `Vagrantfile` at a manifest instead of directly at a box you retain traditional features such as 
+When pointing the `Vagrantfile` at a manifest instead of directly at a box you retain traditional features such as
 versioning and multiple providers.
 
 Configuration
@@ -141,13 +141,13 @@ If not set, will use `public-read`.
 
 Your AWS access key.
 
-If not set, will use `AWS_ACCESS_KEY_ID` environment variable.
+If not set, will use the standard aws sdk credential chain - http://docs.aws.amazon.com/sdk-for-go/latest/v1/developerguide/configuring-sdk.title.html
 
 ### secret_key (optional)
 
 Your AWS secret key.
 
-If not set, will use `AWS_SECRET_ACCESS_KEY` environment variable.
+If not set, will use the standard aws sdk credential chain - http://docs.aws.amazon.com/sdk-for-go/latest/v1/developerguide/configuring-sdk.title.html
 
 ### signed_expiry (optional)
 
