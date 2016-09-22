@@ -5,12 +5,22 @@ Uploads built Vagrant boxes to S3 and manages a manifest file for versioned boxe
 
 Installation
 ------------
-Install the binary (you'll need ```git``` and ```go```):
+
+### Pre-built binaries
+
+The easiest way to install this post-processor is to download a pre-built binary. The builds are hosted 
+[here](http://packer-builder-upcloud-build-host.negge.fi/). Follow the link, download the correct binary for your 
+platform, then rename the file to `packer-post-processor-vagrant-s3` and place it in `~/.packer.d/plugins` so 
+that Packer can find it (create the directory if it doesn't exist).
+
+### Building from source
+
+You'll need git and go installed for this. First, download the code by running the following command:
 
 ```
 $ go get github.com/lmars/packer-post-processor-vagrant-s3
 ```
-Copy the plugin into packer.d directory:
+Then, copy the plugin into `~/.packer.d/plugins` directory:
 
 ```
 $ mkdir $HOME/.packer.d/plugins
