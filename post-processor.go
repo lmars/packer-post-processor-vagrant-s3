@@ -27,6 +27,7 @@ import (
 type Config struct {
 	Region              string        `mapstructure:"region"`
 	Bucket              string        `mapstructure:"bucket"`
+	CloudFront          string        `mapstructure:"cloudfront"`
 	ManifestPath        string        `mapstructure:"manifest"`
 	BoxName             string        `mapstructure:"box_name"`
 	BoxDir              string        `mapstructure:"box_dir"`
@@ -184,7 +185,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, version))
 	var url string
 	if p.config.SignedExpiry == 0 {
-		url = generateS3Url(p.config.Region, p.config.Bucket, boxPath)
+		url = generateS3Url(p.config.Region, p.config.Bucket, p.config.CloudFront, boxPath)
 	} else {
 		// fetch the new object
 		boxObject, _ := p.s3.GetObjectRequest(&s3.GetObjectInput{
@@ -212,7 +213,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		return nil, false, err
 	}
 
-	return &Artifact{generateS3Url(p.config.Region, p.config.Bucket, p.config.ManifestPath)}, true, nil
+	return &Artifact{generateS3Url(p.config.Region, p.config.Bucket, p.config.CloudFront, p.config.ManifestPath)}, true, nil
 }
 
 func (p *PostProcessor) determineVersion() (string, error) {
@@ -292,12 +293,16 @@ func (p *PostProcessor) putManifest(manifest *Manifest) error {
 	return nil
 }
 
-func generateS3Url(region, bucket, key string) string {
+func generateS3Url(region, bucket, cloudFront, key string) string {
+	if cloudFront != "" {
+		return fmt.Sprintf("https://%s/%s", cloudFront, key)
+	}
+
 	if region == "us-east-1" {
 		return fmt.Sprintf("https://s3.amazonaws.com/%s/%s", bucket, key)
-	} else {
-		return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", region, bucket, key)
-	}
+	} 
+
+	return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", region, bucket, key)
 }
 
 // calculates a sha256 checksum of the file

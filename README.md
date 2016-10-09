@@ -165,3 +165,11 @@ If set, generate presigned urls in the manifest valid for a time duration like "
 See https://golang.org/pkg/time/#ParseDuration for syntax.
 
 If not set, generate normal s3 urls.
+
+### cloudfront (optional)
+
+If set, this will be used as the base url for all urls.
+This can not be used in combination with the signed_expiry setting.
+
+If not set, generate normal s3 urls.
+
