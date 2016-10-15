@@ -1,0 +1,11 @@
+sudo: false
+language: go
+go:
+- 1.7
+script:
+- go get github.com/mitchellh/gox
+- gox -arch="amd64" -os="windows linux darwin" -output "dist/{{.OS}}-{{.Arch}}/{{.Dir}}" .
+- zip -j packer-post-processor-vagrant-s3-windows-amd64-${TRAVIS_TAG}.zip ./dist/windows-amd64/*
+- tar -cvzf packer-post-processor-vagrant-s3-linux-amd64-${TRAVIS_TAG}.tar.gz -C dist/linux-amd64/ .
+- tar -cvzf packer-post-processor-vagrant-s3-darwin-amd64-${TRAVIS_TAG}.tar.gz -C dist/darwin-amd64/ .
+
