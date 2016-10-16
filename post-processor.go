@@ -169,10 +169,15 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 
 	// upload the box to S3
 	ui.Message(fmt.Sprintf("Uploading box to S3: %s", boxPath))
+
+	start := time.Now()
 	err = p.uploadBox(box, boxPath)
 
 	if err != nil {
 		return nil, false, err
+	} else {
+		elapsed := time.Since(start)
+		ui.Message(fmt.Sprintf("Box upload took: %s", elapsed))
 	}
 
 	// get the latest manifest so we can add to it
@@ -300,7 +305,7 @@ func generateS3Url(region, bucket, cloudFront, key string) string {
 
 	if region == "us-east-1" {
 		return fmt.Sprintf("https://s3.amazonaws.com/%s/%s", bucket, key)
-	} 
+	}
 
 	return fmt.Sprintf("https://s3-%s.amazonaws.com/%s/%s", region, bucket, key)
 }
