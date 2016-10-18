@@ -33,8 +33,11 @@ type Config struct {
 	BoxDir              string        `mapstructure:"box_dir"`
 	Version             string        `mapstructure:"version"`
 	ACL                 string        `mapstructure:"acl"`
+	CredentialFile      string        `mapstructure:"credentials"`
+	CredentialProfile   string        `mapstructure:"profile"`
 	AccessKey           string        `mapstructure:"access_key_id"`
 	SecretKey           string        `mapstructure:"secret_key"`
+	SessionToken        string        `mapstructure:"session_token"`
 	SignedExpiry        time.Duration `mapstructure:"signed_expiry"`
 	common.PackerConfig `mapstructure:",squash"`
 
@@ -84,16 +87,36 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 	}
 
 	var cred *credentials.Credentials = nil // nil credentials use the default aws sdk credential chain
-	// Setting either credential config variable indicates an attempt to use configured credentials
-	if p.config.AccessKey != "" || p.config.SecretKey != "" {
+
+	if p.config.AccessKey != "" && p.config.SecretKey != "" {
+		// StaticProvider if both access id and secret are defined
+		// Environmental variables used:
+		// $AWS_SESSION_TOKEN
 		cred = credentials.NewCredentials(&credentials.StaticProvider{
 			Value: credentials.Value{
 				AccessKeyID:     p.config.AccessKey,
 				SecretAccessKey: p.config.SecretKey,
-				ProviderName:    "plugin-conf",
+				SessionToken:    p.config.SessionToken,
 			},
 		})
+	} else if p.config.CredentialFile != "" || p.config.CredentialProfile != "" {
+		// SharedCredentialProvider if either credentials file or a profile is defined
+		// Environmental variables used:
+		// $AWS_SHARED_CREDENTIALS_FILE ("$HOME/.aws/credentials" if unset)
+		// $AWS_PROFILE ("default" if unset)
+		cred = credentials.NewCredentials(&credentials.SharedCredentialsProvider{
+			Filename: p.config.CredentialFile,
+			Profile:  p.config.CredentialProfile,
+		})
+	} else {
+		// EnvProvider as fallback if none of the above matched
+		// Environmental variables used:
+		// $AWS_ACCESS_KEY_ID ($AWS_ACCESS_KEY if unset)
+		// $AWS_SECRET_ACCESS_KEY ($AWS_SECRET_KEY if unset)
+		// $AWS_SESSION_TOKEN
+		cred = credentials.NewCredentials(&credentials.EnvProvider{})
 	}
+
 	p.session = session.New(&aws.Config{
 		Region:      aws.String(p.config.Region),
 		Credentials: cred,
@@ -107,7 +130,7 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 	})
 
 	if err != nil {
-		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Unable to access the bucket %s, make sure your credentials are valid and have sufficient permissions", p.config.Bucket))
+		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Unable to access the bucket %s:\n%s\nMake sure your credentials are valid and have sufficient permissions", p.config.Bucket, err))
 	}
 
 	if p.config.ACL == "" {
