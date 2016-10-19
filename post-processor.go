@@ -130,7 +130,7 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 	})
 
 	if err != nil {
-		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Unable to access the bucket %s, make sure your credentials are valid and have sufficient permissions", p.config.Bucket))
+		errs = packer.MultiErrorAppend(errs, fmt.Errorf("Unable to access the bucket %s:\n%s\nMake sure your credentials are valid and have sufficient permissions", p.config.Bucket, err))
 	}
 
 	if p.config.ACL == "" {
