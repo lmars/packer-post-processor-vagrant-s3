@@ -4,9 +4,8 @@ go:
 - 1.7
 
 install:
-  # install glide and gox
-  - go get github.com/mitchellh/gox
-  
+  - go get
+  - go get github.com/mitchellh/gox  
 script:
   # build for all platforms with gox
   - gox -arch="amd64" -os="darwin linux windows" -output "dist/{{.OS}}-{{.Arch}}/{{.Dir}}" .
