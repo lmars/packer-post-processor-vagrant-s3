@@ -36,6 +36,7 @@ type Config struct {
 	AccessKey           string        `mapstructure:"access_key_id"`
 	SecretKey           string        `mapstructure:"secret_key"`
 	SignedExpiry        time.Duration `mapstructure:"signed_expiry"`
+	StorageClass        string        `mapstructure:"storage_class"`
 	common.PackerConfig `mapstructure:",squash"`
 
 	ctx interpolate.Context
@@ -112,6 +113,11 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 
 	if p.config.ACL == "" {
 		p.config.ACL = "public-read"
+	}
+
+	// set default storage class
+	if p.config.StorageClass == "" {
+		p.config.StorageClass = "STANDARD"
 	}
 
 	if len(errs.Errors) > 0 {
@@ -244,10 +250,11 @@ func (p *PostProcessor) uploadBox(box, boxPath string) error {
 	})
 
 	_, err = uploader.Upload(&s3manager.UploadInput{
-		Body:   file,
-		Bucket: aws.String(p.config.Bucket),
-		Key:    aws.String(boxPath),
-		ACL:    aws.String(p.config.ACL),
+		Body:         file,
+		Bucket:       aws.String(p.config.Bucket),
+		Key:          aws.String(boxPath),
+		ACL:          aws.String(p.config.ACL),
+		StorageClass: aws.String(p.config.StorageClass),
 	})
 
 	return err

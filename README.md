@@ -173,3 +173,7 @@ This can not be used in combination with the signed_expiry setting.
 
 If not set, generate normal s3 urls.
 
+### storage_class (optional)
+
+If set, the S3 storage class for the uploaded box file will be set to this. Defaults to `STANDARD`, which is the 
+default for S3. Valid values are `STANDARD`, `STANDARD_IA` (infrequent access), or `REDUCED_REDUNDANCY`.
