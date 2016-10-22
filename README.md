@@ -82,6 +82,92 @@ end
 When pointing the `Vagrantfile` at a manifest instead of directly at a box you retain traditional features such as
 versioning and multiple providers.
 
+Providers
+-------------
+
+There are three AWS credential providers that are used:
+
+* Static credentials
+* Shared credentials
+* Environmental credentials
+
+### Static credentials configuration
+
+Static credentials are used when **both** of the configuration variables `access_key_id` and
+`secret_key` are defined:
+
+```json
+{
+  "post-processors": [
+    [
+      {
+        "type":     "vagrant-s3",
+        ...
+        "access_key_id": "AKIAIOSFODNN7EXAMPLE",
+        "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        "session_token": "{{ user `session_token` }}",
+        ...
+      }
+    ]
+  ]
+}
+```
+
+It isn't necessary to define the `session_token` variable, even when using the STS token service for
+authenticating. By default the session token will be generated and cached during the initial request.
+
+The only reason to define `session_token` is when a token has already been generated on behalf of the
+build process via external means (ie: a corporate SSO end-point). You can define this using the
+environmental variable `$AWS_SESSION_TOKEN` or by passing it in from the command line:
+
+```shell
+$ packer build -var "session_token=$TOKEN" template.json
+```
+
+### Shared credentials configuration
+
+Shared credentials are used when **either** of the configuration variables are defined:
+
+```json
+{
+  "post-processors": [
+    [
+      {
+        "type":     "vagrant-s3",
+        ...
+        "credentials": "~/.aws/credentials",
+        "profile": "vagrant-s3-creds",
+      }
+    ]
+  ]
+}
+```
+
+The above configuration will use the `[vagrant-s3-creds]` profile from the credentials file located at
+`~/.aws/credentials`:
+
+```
+[vagrant-s3-creds]
+aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+If `credentials` is not defined then the environmental variable `$AWS_SHARED_CREDENTIALS_FILE` will
+be used to look for a credentials file, otherwise it will look for it in the default location
+(`$HOME/.aws/credentials`).
+
+If the `profile` variable is not defined, the environmental variable `$AWS_PROFILE` will be used,
+otherwise the `[default]` profile will be used if it exists.
+
+### Environmental credentials configuration
+
+Environmental credentials are used when **none** of the other variables are defined and will instead
+attempt to populate the credentials using the following environmental variables:
+
+*  `$AWS_ACCESS_KEY_ID` (`$AWS_ACCESS_KEY` if unset)
+*  `$AWS_SECRET_ACCESS_KEY` (`$AWS_SECRET_KEY` if unset)
+*  `$AWS_SESSION_TOKEN`
+
 Configuration
 -------------
 
@@ -146,18 +232,6 @@ Valid values:
 * bucket-owner-full-control
 
 If not set, will use `public-read`.
-
-### access_key_id (optional)
-
-Your AWS access key.
-
-If not set, will use the standard aws sdk credential chain - http://docs.aws.amazon.com/sdk-for-go/latest/v1/developerguide/configuring-sdk.title.html
-
-### secret_key (optional)
-
-Your AWS secret key.
-
-If not set, will use the standard aws sdk credential chain - http://docs.aws.amazon.com/sdk-for-go/latest/v1/developerguide/configuring-sdk.title.html
 
 ### signed_expiry (optional)
 
