@@ -1,5 +1,11 @@
 # Change log
 
+## 1.3.0
+
+* add this change log
+* add support for specifying the S3 storage class of uploaded box files
+* add support for more AWS credentials providers (static, shared, environmental) 
+
 ## 1.2.0
 
 * Log how long it took to upload a box file to S3
