@@ -53,7 +53,7 @@ Add the post-processor to your packer template **after** the `vagrant` post-proc
         "bucket":   "my-s3-bucket",
         "manifest": "vagrant/json/{{ user `box_organization` }}/{{ user `box_name` }}.json",
         "box_dir":  "vagrant/boxes/{{ user `box_organization` }}/{{ user `box_name` }}",
-        "box_name": "{{ user `box_organization` }}{{ user `box_name` }}",
+        "box_name": "{{ user `box_organization` }}/{{ user `box_name` }}",
         "version":  "{{ user `version` }}"
       }
     ]
