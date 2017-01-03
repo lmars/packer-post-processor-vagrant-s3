@@ -1,5 +1,9 @@
 # Change log
 
+## 1.3.2
+
+* minor fix to the Travis release process 
+
 ## 1.3.1
 
 * generate releases on Travis and host them on GitHub instead
