@@ -8,10 +8,11 @@ Installation
 
 ### Pre-built binaries
 
-The easiest way to install this post-processor is to download a pre-built binary. The builds are hosted 
-[here](http://packer-post-processor-vagrant-s3-build-host.negge.fi/). Follow the link, download the correct binary for your 
-platform, then rename the file to `packer-post-processor-vagrant-s3` and place it in `~/.packer.d/plugins` so 
-that Packer can find it (create the directory if it doesn't exist).
+The easiest way to install this post-processor is to download a pre-built binary. The builds are available from the 
+[GitHub releases page](https://github.com/lmars/packer-post-processor-vagrant-s3/releases). Follow the link, select the 
+latest release, download the correct binary for your platform, then rename the file to 
+`packer-post-processor-vagrant-s3` and place it in `~/.packer.d/plugins` so that Packer can find it (create the 
+directory if it doesn't exist).
 
 ### Building from source
 
