@@ -20,7 +20,7 @@ deploy:
     secure: gdpfaNRcBOmy6m+mIFW0cGOGbZwe30cuth7tWe0CGIoKyBTz6x5oo+0ErD6L3phYQij9ltXHKJ0/aA4U57KlVU1OUn6HhweqHHmtuh1/bKl0pxxyWciN1WxDz/50/ZtQUez7J94gqOvPHk6DmPd5EKJcLUJIwb45CpNHmbiS7I8=
   file:
     - packer-post-processor-vagrant-s3-${TRAVIS_TAG}-darwin-amd64.zip
-    - packer-post-processor-vagrant-s3-${TRAVIS_TAG}-darwin-amd64.zip
+    - packer-post-processor-vagrant-s3-${TRAVIS_TAG}-linux-amd64.zip
     - packer-post-processor-vagrant-s3-${TRAVIS_TAG}-windows-amd64.zip
   on:
     repo: lmars/packer-post-processor-vagrant-s3

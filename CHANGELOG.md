@@ -1,5 +1,9 @@
 # Change log
 
+## 1.3.3
+
+* fix missing Linux release due to typo
+
 ## 1.3.2
 
 * minor fix to the Travis release process 
