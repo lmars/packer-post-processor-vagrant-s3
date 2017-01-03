@@ -1,6 +1,8 @@
 Packer Vagrant S3 post-processor
 ================================
 
+[![Build Status](https://travis-ci.org/lmars/packer-post-processor-vagrant-s3.svg?branch=master)](https://travis-ci.org/lmars/packer-post-processor-vagrant-s3)
+
 Uploads built Vagrant boxes to S3 and manages a manifest file for versioned boxes.
 
 Installation
