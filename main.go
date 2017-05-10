@@ -1,6 +1,6 @@
 package main
 
-import "github.com/mitchellh/packer/packer/plugin"
+import "github.com/hashicorp/packer/packer/plugin"
 
 func main() {
 	server, err := plugin.Server()
