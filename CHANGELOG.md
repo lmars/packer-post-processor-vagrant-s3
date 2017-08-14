@@ -1,5 +1,9 @@
 # Change log
 
+## 1.4.0
+
+* add support for overriding some S3 uploader options, useful on less reliable connections
+
 ## 1.3.3
 
 * fix missing Linux release due to typo

@@ -254,3 +254,12 @@ If not set, generate normal s3 urls.
 
 If set, the S3 storage class for the uploaded box file will be set to this. Defaults to `STANDARD`, which is the 
 default for S3. Valid values are `STANDARD`, `STANDARD_IA` (infrequent access), or `REDUCED_REDUNDANCY`.
+
+### part_size (optional)
+
+The part size (in bytes) to use when uploading the box to S3. See the AWS SDK for the default value.
+
+### concurrency (optional)
+
+The concurrency to use when uploading the box to S3. See the AWS SDK for the default value. Lower this if you have 
+difficulties successfully uploading a box on slow/unreliable connections.
