@@ -40,6 +40,8 @@ type Config struct {
 	SessionToken        string        `mapstructure:"session_token"`
 	SignedExpiry        time.Duration `mapstructure:"signed_expiry"`
 	StorageClass        string        `mapstructure:"storage_class"`
+	PartSize            int64         `mapstructure:"part_size"`
+	Concurrency         int           `mapstructure:"concurrency"`
 	common.PackerConfig `mapstructure:",squash"`
 
 	ctx interpolate.Context
@@ -143,6 +145,14 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 		p.config.StorageClass = "STANDARD"
 	}
 
+	if p.config.PartSize == 0 {
+		p.config.PartSize = s3manager.DefaultUploadPartSize
+	}
+
+	if p.config.Concurrency == 0 {
+		p.config.Concurrency = s3manager.DefaultUploadConcurrency
+	}
+
 	if len(errs.Errors) > 0 {
 		return errs
 	}
@@ -197,7 +207,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message(fmt.Sprintf("Checksum is %s", checksum))
 
 	// upload the box to S3
-	ui.Message(fmt.Sprintf("Uploading box to S3: %s", boxPath))
+	ui.Message(fmt.Sprintf("Uploading box to S3: %s, PartSize: %d, Concurrency: %d", boxPath, p.config.PartSize, p.config.Concurrency))
 
 	start := time.Now()
 	err = p.uploadBox(box, boxPath)
@@ -269,7 +279,8 @@ func (p *PostProcessor) uploadBox(box, boxPath string) error {
 
 	// upload the file
 	uploader := s3manager.NewUploader(p.session, func(u *s3manager.Uploader) {
-		u.PartSize = 1024 * 1024 * 64
+		u.PartSize = p.config.PartSize
+		u.Concurrency = p.config.Concurrency
 	})
 
 	_, err = uploader.Upload(&s3manager.UploadInput{
