@@ -33,6 +33,7 @@ type Config struct {
 	BoxDir              string        `mapstructure:"box_dir"`
 	Version             string        `mapstructure:"version"`
 	ACL                 string        `mapstructure:"acl"`
+	ServerSideEncryption string       `mapstructure:"server_side_encryption"`
 	CredentialFile      string        `mapstructure:"credentials"`
 	CredentialProfile   string        `mapstructure:"profile"`
 	AccessKey           string        `mapstructure:"access_key_id"`
@@ -207,7 +208,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message(fmt.Sprintf("Checksum is %s", checksum))
 
 	// upload the box to S3
-	ui.Message(fmt.Sprintf("Uploading box to S3: %s, PartSize: %d, Concurrency: %d", boxPath, p.config.PartSize, p.config.Concurrency))
+  ui.Message(fmt.Sprintf("Uploading box to S3: %s, PartSize: %d, Concurrency: %d, SSE:%s", boxPath, p.config.PartSize, p.config.Concurrency, p.config.ServerSideEncryption))
 
 	start := time.Now()
 	err = p.uploadBox(box, boxPath)
@@ -288,6 +289,7 @@ func (p *PostProcessor) uploadBox(box, boxPath string) error {
 		Bucket:       aws.String(p.config.Bucket),
 		Key:          aws.String(boxPath),
 		ACL:          aws.String(p.config.ACL),
+		ServerSideEncryption:          aws.String(p.config.ServerSideEncryption),
 		StorageClass: aws.String(p.config.StorageClass),
 	})
 
@@ -330,6 +332,7 @@ func (p *PostProcessor) putManifest(manifest *Manifest) error {
 		Key:         aws.String(p.config.ManifestPath),
 		ContentType: aws.String("application/json"),
 		ACL:         aws.String(p.config.ACL),
+		ServerSideEncryption: aws.String(p.config.ServerSideEncryption),
 	})
 
 	if err != nil {
