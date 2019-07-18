@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -160,16 +161,17 @@ func (p *PostProcessor) Configure(raws ...interface{}) error {
 	return nil
 }
 
-func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (packer.Artifact, bool, error) {
+func (p *PostProcessor) PostProcess(context context.Context, ui packer.Ui, artifact packer.Artifact) (packer.Artifact, bool, bool, error) {
 	// Only accept input from the vagrant post-processor
-	if artifact.BuilderId() != "mitchellh.post-processor.vagrant" {
-		return nil, false, fmt.Errorf("Unknown artifact type, requires box from vagrant post-processor: %s", artifact.BuilderId())
+
+	if artifact.BuilderId() != "mitchellh.post-processor.vagrant" && artifact.BuilderId() != "vagrant"  {
+		return nil, false, false, fmt.Errorf("Unknown artifact type, requires box from vagrant post-processor: %s", artifact.BuilderId())
 	}
 
 	// Assume there is only one .box file to upload
 	box := artifact.Files()[0]
 	if !strings.HasSuffix(box, ".box") {
-		return nil, false, fmt.Errorf("Unknown files in artifact from vagrant post-processor: %s", artifact.Files())
+		return nil, false, false, fmt.Errorf("Unknown files in artifact from vagrant post-processor: %s", artifact.Files())
 	}
 
 	provider := providerFromBuilderName(artifact.Id())
@@ -178,7 +180,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	// determine box size
 	boxStat, err := os.Stat(box)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	ui.Message(fmt.Sprintf("Box to upload: %s (%d bytes)", box, boxStat.Size()))
 
@@ -188,7 +190,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	if version == "" {
 		version, err = p.determineVersion()
 		if err != nil {
-			return nil, false, err
+			return nil, false, false, err
 		}
 
 		ui.Message(fmt.Sprintf("No version defined, using %s as new version", version))
@@ -202,7 +204,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message("Generating checksum")
 	checksum, err := sum256(box)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	ui.Message(fmt.Sprintf("Checksum is %s", checksum))
 
@@ -213,7 +215,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	err = p.uploadBox(box, boxPath)
 
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	} else {
 		elapsed := time.Since(start)
 		ui.Message(fmt.Sprintf("Box upload took: %s", elapsed))
@@ -223,7 +225,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 	ui.Message("Fetching latest manifest")
 	manifest, err := p.getManifest()
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 
 	ui.Message(fmt.Sprintf("Adding %s %s box to manifest", provider, version))
@@ -240,7 +242,7 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		url, err = boxObject.Presign(p.config.SignedExpiry)
 
 		if err != nil {
-			return nil, false, err
+			return nil, false, false, err
 		}
 	}
 	if err := manifest.add(version, &Provider{
@@ -249,15 +251,15 @@ func (p *PostProcessor) PostProcess(ui packer.Ui, artifact packer.Artifact) (pac
 		ChecksumType: "sha256",
 		Checksum:     checksum,
 	}); err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 
 	ui.Message(fmt.Sprintf("Uploading the manifest: %s", p.config.ManifestPath))
 	if err := p.putManifest(manifest); err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 
-	return &Artifact{generateS3Url(p.config.Region, p.config.Bucket, p.config.CloudFront, p.config.ManifestPath)}, true, nil
+	return &Artifact{generateS3Url(p.config.Region, p.config.Bucket, p.config.CloudFront, p.config.ManifestPath)}, true, false, nil
 }
 
 func (p *PostProcessor) determineVersion() (string, error) {
