@@ -1,12 +1,12 @@
 package main
 
-import "github.com/hashicorp/packer/packer/plugin"
+import "github.com/hashicorp/packer-plugin-sdk/plugin"
 
 func main() {
-	server, err := plugin.Server()
+  pps := plugin.NewSet();
+  pps.RegisterPostProcessor("vagrant-s3", new(PostProcessor))
+  err := pps.Run()
 	if err != nil {
 		panic(err)
 	}
-	server.RegisterPostProcessor(&PostProcessor{})
-	server.Serve()
 }
