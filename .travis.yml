@@ -8,7 +8,7 @@ install:
   - go get github.com/mitchellh/gox  
 script:
   # build for all platforms with gox
-  - gox -arch="amd64" -os="darwin linux windows" -output "dist/{{.OS}}-{{.Arch}}/{{.Dir}}" .
+  - gox -arch="amd64" -os="darwin linux windows" -output "dist/{{.OS}}-{{.Arch}}/packer-plugin-vagrant-s3" .
   # create one archive per platform
   - zip -j packer-post-processor-vagrant-s3-${TRAVIS_TAG}-darwin-amd64.zip ./dist/darwin-amd64/*
   - zip -j packer-post-processor-vagrant-s3-${TRAVIS_TAG}-linux-amd64.zip ./dist/linux-amd64/*
