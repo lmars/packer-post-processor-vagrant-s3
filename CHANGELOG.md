@@ -1,5 +1,11 @@
 # Change log
 
+## 1.5.0
+
+* make plugin compatible with Packer 1.6+ (https://github.com/lmars/packer-post-processor-vagrant-s3/pull/62)
+* make plugin compatible with go modules, make configuration hcl2 compatible (https://github.com/lmars/packer-post-processor-vagrant-s3/pull/59)
+* allow vagrant builder without using vagrant post-processor (https://github.com/lmars/packer-post-processor-vagrant-s3/issues/56)
+
 ## 1.4.0
 
 * add support for overriding some S3 uploader options, useful on less reliable connections
