@@ -4,7 +4,6 @@
 
 * support packer init
 * switch CI to github actions
-* bump go version to 1.17
 
 ## 1.5.0
 
