@@ -1,7 +1,7 @@
 Packer Vagrant S3 post-processor
 ================================
 
-[![Build Status](https://travis-ci.org/lmars/packer-post-processor-vagrant-s3.svg?branch=master)](https://travis-ci.org/lmars/packer-post-processor-vagrant-s3)
+[![Build Status](https://github.com/lmars/packer-plugin-vagrant-s3/actions/workflows/release.yml/badge.svg)](https://github.com/lmars/packer-plugin-vagrant-s3/actions/workflows/release.yml)
 
 Uploads built Vagrant boxes to S3 and manages a manifest file for versioned boxes.
 
@@ -10,61 +10,85 @@ Installation
 
 ### Pre-built binaries
 
-The easiest way to install this post-processor is to download a pre-built binary. The builds are available from the 
-[GitHub releases page](https://github.com/lmars/packer-post-processor-vagrant-s3/releases). Follow the link, select the 
-latest release, download the correct binary for your platform, then rename the file to 
-`packer-post-processor-vagrant-s3` and place it in `~/.packer.d/plugins` so that Packer can find it (create the 
-directory if it doesn't exist).
+#### Using the `packer init` command
 
-### Building from source
+Starting from version 1.7, Packer supports a new `packer init` command allowing
+automatic installation of Packer plugins. Read the
+[Packer documentation](https://www.packer.io/docs/commands/init) for more information.
 
-You'll need git and go installed for this. First, download the code by running the following command:
+To install this plugin, copy and paste this code into your Packer configuration .
+Then, run [`packer init`](https://www.packer.io/docs/commands/init).
 
+```hcl
+packer {
+  required_plugins {
+    amazon = {
+      version = ">= 1.6.0"
+      source  = "github.com/lmars/vagrant-s3"
+    }
+  }
+}
 ```
-$ go get github.com/lmars/packer-post-processor-vagrant-s3
-```
-Then, copy the plugin into `~/.packer.d/plugins` directory:
 
-```
-$ mkdir $HOME/.packer.d/plugins
-$ cp $GOPATH/bin/packer-post-processor-vagrant-s3 $HOME/.packer.d/plugins
 
-```
+#### Manual installation
+
+You can find pre-built binary releases of the plugin [here](https://github.com/lmars/packer-plugin-vagrant-s3/releases).
+Once you have downloaded the latest archive corresponding to your target OS,
+uncompress it to retrieve the plugin binary file corresponding to your platform.
+To install the plugin, please follow the Packer documentation on
+[installing a plugin](https://www.packer.io/docs/extending/plugins/#installing-plugins).
+
 Usage
 -----
 
 Add the post-processor to your packer template **after** the `vagrant` post-processor:
 
-```json
-{
-  "variables": {
-    "version":  "0.0.1",
-    "box_organization": "my-organization",
-    "box_name": "my-cool-project"
-  },
-  "builders": [ ... ],
-  "provisioners": [ ... ],
-  "post-processors": [
-    [
-      {
-        "type": "vagrant"
-        ...
-      },
-      {
-        "type":     "vagrant-s3",
-        "region": "us-east-1",
-        "bucket":   "my-s3-bucket",
-        "manifest": "vagrant/json/{{ user `box_organization` }}/{{ user `box_name` }}.json",
-        "box_dir":  "vagrant/boxes/{{ user `box_organization` }}/{{ user `box_name` }}",
-        "box_name": "{{ user `box_organization` }}/{{ user `box_name` }}",
-        "version":  "{{ user `version` }}"
-      }
-    ]
-  ]
+```hcl
+packer {
+  required_plugins {
+    vagrant-s3 = {
+      version = ">= 1.6.0"
+      source  = "github.com/lmars/vagrant-s3"
+    }
+  }
+}
+
+variable "version" {
+  type    = string
+  default = "0.0.1"
+}
+
+variable "box_organization" {
+  type    = string
+  default = "my-organization"
+}
+
+variable "box_name" {
+  type    = string
+  default = "my-cool-project"
+}
+
+source "virtualbox-iso" "my-cool-project" { ... }
+
+build {
+  sources = ["source.virtualbox-iso.browsertest"]
+
+  provisioner "file" { ... }
+
+  post-processors {
+    post-processor "vagrant" { ... }
+    post-processor "vagrant-s3" {
+      box_dir     = "vagrant/boxes/${var.box_organisation}/${var.box_name}"
+      box_name    = "${var.box_organisation}/${var.box_name}"
+      bucket      = "my-s3-bucket"
+      manifest    = "vagrant/json/${var.box_organisation}/${var.box_name}.json"
+      region      = "us-east-1"
+      version     = "${var.version}"
+    }
+  }
 }
 ```
-
-**NOTE:** The post-processors must be a **nested array** (i.e.: a Packer sequence definition) so that they run in order. See the [Packer template documentation](http://www.packer.io/docs/templates/post-processors.html) for more information.
 
 The above will result in the following objects being created in S3:
 
@@ -252,7 +276,7 @@ If not set, generate normal s3 urls.
 
 ### storage_class (optional)
 
-If set, the S3 storage class for the uploaded box file will be set to this. Defaults to `STANDARD`, which is the 
+If set, the S3 storage class for the uploaded box file will be set to this. Defaults to `STANDARD`, which is the
 default for S3. Valid values are `STANDARD`, `STANDARD_IA` (infrequent access), or `REDUCED_REDUNDANCY`.
 
 ### part_size (optional)
@@ -261,5 +285,5 @@ The part size (in bytes) to use when uploading the box to S3. See the AWS SDK fo
 
 ### concurrency (optional)
 
-The concurrency to use when uploading the box to S3. See the AWS SDK for the default value. Lower this if you have 
+The concurrency to use when uploading the box to S3. See the AWS SDK for the default value. Lower this if you have
 difficulties successfully uploading a box on slow/unreliable connections.
