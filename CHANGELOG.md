@@ -1,5 +1,10 @@
 # Change log
 
+## 1.6.0
+
+* support packer init
+* switch CI to github actions
+
 ## 1.5.0
 
 * make plugin compatible with Packer 1.6+ (https://github.com/lmars/packer-post-processor-vagrant-s3/pull/62)
@@ -16,7 +21,7 @@
 
 ## 1.3.2
 
-* minor fix to the Travis release process 
+* minor fix to the Travis release process
 
 ## 1.3.1
 
@@ -26,7 +31,7 @@
 
 * add this change log
 * add support for specifying the S3 storage class of uploaded box files
-* add support for more AWS credentials providers (static, shared, environmental) 
+* add support for more AWS credentials providers (static, shared, environmental)
 
 ## 1.2.0
 
